@@ -1,0 +1,819 @@
+Ultra Physics
+<html lang="en" class="h-full bg-slate-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Particle Simulator: Reactive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background-image: radial-gradient(circle at 50% 0%, #0f172a, #020617);
+            overflow: hidden;
+        }
+        
+        h1, h2, h3 { font-family: 'Orbitron', sans-serif; }
+
+        /* Canvas & UI */
+        canvas {
+            image-rendering: pixelated;
+            touch-action: none;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.6));
+            transition: transform 0.05s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.92); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        /* Neon Buttons */
+        .btn-neon {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.15s ease-out;
+        }
+        .btn-neon:active { transform: scale(0.95); }
+        .btn-active {
+            box-shadow: 0 0 15px currentColor, inset 0 0 10px currentColor;
+            border-color: currentColor;
+            color: #fff !important;
+            text-shadow: 0 0 5px currentColor;
+            background-color: rgba(30, 41, 59, 0.9) !important;
+        }
+
+        /* Dr. Pixel Character */
+        .scientist-container {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 50;
+            pointer-events: none;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .scientist-emoji {
+            font-size: 4rem;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.3));
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+        .speech-bubble {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            background: white;
+            color: black;
+            padding: 8px 16px;
+            border-radius: 20px 20px 0 20px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            opacity: 0;
+            transform: translateY(10px) scale(0.8);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            margin-bottom: 10px;
+        }
+        .speech-bubble.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        /* Floating animation for Zero G */
+        .floating { animation: float 3s ease-in-out infinite; }
+        @keyframes float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-15px) rotate(5deg); } }
+        
+        /* Shaking for fear */
+        .shaking { animation: shake 0.5s infinite; }
+        @keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 10% { transform: translate(-1px, -2px) rotate(-1deg); } 20% { transform: translate(-3px, 0px) rotate(1deg); } 30% { transform: translate(3px, 2px) rotate(0deg); } 40% { transform: translate(1px, -1px) rotate(1deg); } 50% { transform: translate(-1px, 2px) rotate(-1deg); } 60% { transform: translate(-3px, 1px) rotate(0deg); } 70% { transform: translate(3px, 1px) rotate(-1deg); } 80% { transform: translate(-1px, -1px) rotate(1deg); } 90% { transform: translate(1px, 2px) rotate(0deg); } 100% { transform: translate(1px, -2px) rotate(-1deg); } }
+    </style>
+</head>
+<body class="h-full flex flex-col text-gray-200">
+
+    <!-- Header -->
+    <header class="w-full glass-panel z-30 shrink-0 border-b border-slate-800">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-lg md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 neon-text tracking-widest italic">
+                HYPER-MATTER <span class="text-xs not-italic text-slate-500 font-normal ml-2">v2.0</span>
+            </h1>
+            
+            <div class="flex items-center gap-3">
+                <!-- Gravity Toggle -->
+                <button id="gravityBtn" class="p-2 rounded-full bg-slate-800 border border-slate-600 hover:border-cyan-400 hover:text-cyan-400 transition-all text-blue-300 shadow-lg group" title="Toggle Gravity">
+                    <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                </button>
+                
+                <!-- Play/Pause -->
+                <button id="pauseBtn" class="p-2 rounded-full bg-slate-800 border border-slate-600 hover:border-yellow-400 hover:text-yellow-400 transition-all text-cyan-300 shadow-lg" title="Pause Simulation">
+                    <svg id="iconPause" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>
+                    <svg id="iconPlay" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+
+                <div class="hidden md:flex flex-col items-end text-[10px] text-gray-400 font-mono leading-tight ml-2">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-cyan-400 font-bold">BRUSH</span>
+                        <input id="brushSizeSlider" type="range" min="1" max="12" value="3" class="w-20 accent-cyan-500">
+                    </div>
+                    <div class="bg-slate-900 px-2 py-0.5 rounded text-xs border border-slate-700"><span id="fpsCounter" class="text-emerald-400 font-bold">60</span> FPS</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+        
+        <!-- Controls Sidebar -->
+        <div class="lg:w-80 w-full glass-panel flex flex-col order-2 lg:order-1 border-t lg:border-t-0 lg:border-r border-slate-800 z-20 shadow-2xl">
+            <div class="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
+                
+                <!-- Active Element Display -->
+                <div class="relative group">
+                    <div class="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-slate-700 shadow-inner">
+                        <div class="flex items-center gap-3">
+                            <div id="activeColorIndicator" class="w-6 h-6 rounded-full shadow-[0_0_10px_currentColor] transition-colors duration-300 border-2 border-white/10"></div>
+                            <div>
+                                <p class="text-[9px] text-slate-400 uppercase tracking-[0.2em] font-bold">Active Element</p>
+                                <h2 id="activeElementDisplay" class="text-xl font-black text-white tracking-widest drop-shadow-md transition-colors duration-300">SAND</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Categories -->
+                <div class="space-y-6">
+                    <!-- Solids -->
+                    <div>
+                        <h3 class="text-[10px] font-bold text-cyan-400 uppercase tracking-[0.2em] mb-2 pl-1 flex items-center gap-2 border-b border-cyan-900/30 pb-1">
+                            Solids
+                        </h3>
+                        <div id="basicButtons" class="grid grid-cols-3 gap-2"></div>
+                    </div>
+
+                    <!-- Fluids -->
+                    <div>
+                        <h3 class="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em] mb-2 pl-1 flex items-center gap-2 border-b border-blue-900/30 pb-1">
+                            Fluids
+                        </h3>
+                        <div id="liquidButtons" class="grid grid-cols-3 gap-2"></div>
+                    </div>
+
+                    <!-- Energy/Chaos -->
+                    <div>
+                        <h3 class="text-[10px] font-bold text-fuchsia-400 uppercase tracking-[0.2em] mb-2 pl-1 flex items-center gap-2 border-b border-fuchsia-900/30 pb-1">
+                            Reactives
+                        </h3>
+                        <div id="chaosButtons" class="grid grid-cols-3 gap-2"></div>
+                    </div>
+                </div>
+
+                <!-- Reset -->
+                <button id="clearBtn" class="mt-auto w-full group relative px-4 py-3 bg-red-500/10 border border-red-500/30 text-red-400 font-bold rounded-xl overflow-hidden hover:bg-red-500 hover:text-white transition-all duration-300 shadow-lg">
+                    <div class="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-red-500/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1s_infinite]"></div>
+                    <span class="relative z-10 flex items-center justify-center gap-2 tracking-widest text-xs">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        FLUSH REACTOR
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Area -->
+        <div class="flex-1 relative bg-black flex items-center justify-center order-1 lg:order-2 p-0 lg:p-6 overflow-hidden">
+            <!-- Grid Background -->
+            <div class="absolute inset-0 opacity-20 pointer-events-none" 
+                 style="background-image: linear-gradient(#334155 1px, transparent 1px), linear-gradient(90deg, #334155 1px, transparent 1px); background-size: 40px 40px;">
+            </div>
+            
+            <div id="canvasContainer" class="relative w-full h-full max-w-[650px] aspect-square flex items-center justify-center shadow-[0_0_100px_rgba(56,189,248,0.1)] rounded-lg overflow-hidden border-2 border-slate-800 bg-black transition-transform will-change-transform">
+                <canvas id="simCanvas"></canvas>
+            </div>
+            
+            <!-- Dr. Pixel (The Observer) -->
+            <div id="scientist" class="scientist-container hidden md:block">
+                <div id="bubble" class="speech-bubble">Hello! I'm Dr. Pixel.</div>
+                <div id="avatar" class="scientist-emoji">👨‍🔬</div>
+            </div>
+
+            <!-- Mobile Brush -->
+            <div class="absolute bottom-6 right-6 lg:hidden glass-panel p-3 rounded-full flex items-center shadow-xl border border-slate-600">
+                <span class="text-[10px] font-bold text-cyan-300 mr-2">SIZE</span>
+                <input id="mobileBrushSlider" type="range" min="1" max="10" value="3" class="w-32 accent-cyan-500">
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        // --- Engine Config ---
+        const GRID_SIZE = 150;
+        const SHAKE_DECAY = 0.9;
+        
+        // --- Element Definitions ---
+        const ELEMENTS = {
+            // --- SOLIDS ---
+            EMPTY:    { id: 0,  color: '#000000', density: 0, type: 'gas', label: 'Void', glow: false, cat: 'basic' },
+            WALL:     { id: 1,  color: '#64748b', density: 100, type: 'solid', label: 'Titanium', glow: false, cat: 'basic' },
+            SAND:     { id: 2,  color: '#facc15', density: 50, type: 'powder', label: 'Sand', glow: false, cat: 'basic' },
+            GUNPOWDER:{ id: 14, color: '#57534e', density: 45, type: 'powder', label: 'Gunpowder', glow: false, cat: 'basic' },
+            ICE:      { id: 15, color: '#bae6fd', density: 100, type: 'solid', label: 'Ice', glow: true, cat: 'basic' },
+            PLANT:    { id: 3,  color: '#22c55e', density: 80, type: 'solid', label: 'Plant', glow: true, cat: 'basic' },
+            FUSE:     { id: 16, color: '#ea580c', density: 90, type: 'solid', label: 'Fuse', glow: false, cat: 'basic' },
+
+            // --- FLUIDS ---
+            WATER:    { id: 4,  color: '#3b82f6', density: 10, type: 'liquid', label: 'Water', glow: true, cat: 'liquid' }, // Deep Blue
+            OIL:      { id: 5,  color: '#a855f7', density: 5, type: 'liquid', label: 'Oil', glow: false, cat: 'liquid' },
+            ACID:     { id: 6,  color: '#a3e635', density: 12, type: 'liquid', label: 'Acid', glow: true, cat: 'liquid' }, // Neon Lime
+            LAVA:     { id: 7,  color: '#f97316', density: 20, type: 'liquid', label: 'Lava', glow: true, cat: 'liquid' },
+
+            // --- CHAOS ---
+            FIRE:     { id: 8,  color: '#fbbf24', density: -5, type: 'gas', label: 'Fire', glow: true, cat: 'chaos' }, // Yellow-Orange
+            STEAM:    { id: 9,  color: '#cbd5e1', density: -10, type: 'gas', label: 'Steam', glow: false, cat: 'chaos' },
+            METHANE:  { id: 17, color: '#10b981', density: -15, type: 'gas', label: 'Methane', glow: true, cat: 'chaos' }, // Gas Green
+            C4:       { id: 10, color: '#ef4444', density: 90, type: 'solid', label: 'C-4', glow: false, cat: 'chaos' },
+            THUNDER:  { id: 11, color: '#e0f2fe', density: 0, type: 'energy', label: 'Thunder', glow: true, cat: 'chaos' },
+            METEOR:   { id: 18, color: '#f59e0b', density: 200, type: 'solid', label: 'Meteor', glow: true, cat: 'chaos' },
+            VOID:     { id: 12, color: '#312e81', density: 1000, type: 'solid', label: 'Void', glow: true, cat: 'chaos' },
+            VIRUS:    { id: 13, color: '#14b8a6', density: 60, type: 'solid', label: 'Virus', glow: true, cat: 'chaos' },
+            FIREWORK: { id: 19, color: '#f472b6', density: -20, type: 'projectile', label: 'Firework', glow: true, cat: 'chaos' }
+        };
+        
+        const ELEMENT_LOOKUP = Object.values(ELEMENTS);
+
+        // --- Global State ---
+        let grid = [];
+        let canvas, ctx, canvasContainer;
+        let activeElement = ELEMENTS.SAND;
+        let brushSize = 3;
+        let isDrawing = false;
+        let isPaused = false;
+        let gravityEnabled = true;
+        let lastGridX = -1, lastGridY = -1;
+        let shakeIntensity = 0;
+        
+        let lastTime = performance.now();
+        let frames = 0;
+        let tick = 0; 
+        
+        // Observer State
+        let elementCounts = {};
+        let bubbleTimeout = null;
+
+        // --- UI References ---
+        const uiGroups = {
+            basic: document.getElementById('basicButtons'),
+            liquid: document.getElementById('liquidButtons'),
+            chaos: document.getElementById('chaosButtons')
+        };
+        const activeElementDisplay = document.getElementById('activeElementDisplay');
+        const activeColorIndicator = document.getElementById('activeColorIndicator');
+        const fpsCounter = document.getElementById('fpsCounter');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const gravityBtn = document.getElementById('gravityBtn');
+        const avatar = document.getElementById('avatar');
+        const bubble = document.getElementById('bubble');
+
+        // --- Core Functions ---
+
+        function initGrid() {
+            grid = new Array(GRID_SIZE);
+            for (let y = 0; y < GRID_SIZE; y++) {
+                grid[y] = new Array(GRID_SIZE).fill(ELEMENTS.EMPTY.id);
+            }
+            for (let x = 0; x < GRID_SIZE; x++) grid[GRID_SIZE - 1][x] = ELEMENTS.WALL.id;
+        }
+
+        function initCanvas() {
+            canvas = document.getElementById('simCanvas');
+            canvasContainer = document.getElementById('canvasContainer');
+            ctx = canvas.getContext('2d', { alpha: false });
+            canvas.width = GRID_SIZE;
+            canvas.height = GRID_SIZE;
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, GRID_SIZE, GRID_SIZE);
+        }
+
+        function initUI() {
+            Object.keys(ELEMENTS).forEach(key => {
+                const el = ELEMENTS[key];
+                if (el.id === ELEMENTS.EMPTY.id) return;
+
+                const btn = document.createElement('button');
+                let borderClass = 'border-slate-700';
+                let bgClass = 'bg-slate-900/50';
+                
+                if (el.cat === 'chaos') { borderClass = 'border-fuchsia-500/30'; }
+                if (el.cat === 'liquid') { borderClass = 'border-blue-500/30'; }
+
+                btn.className = `btn-neon flex flex-col items-center justify-center p-2 rounded-lg border ${borderClass} ${bgClass} hover:bg-slate-800 text-[9px] font-bold transition-all text-slate-300 h-16 shadow-sm`;
+                
+                btn.innerHTML = `
+                    <div class="w-full h-1.5 mb-2 rounded-full transition-all ring-1 ring-white/10" style="background-color: ${el.color}; box-shadow: 0 0 8px ${el.color}"></div>
+                    ${el.label}
+                `;
+                btn.onclick = () => {
+                    setActiveElement(el, btn);
+                    triggerSpeech(`Let's try ${el.label}!`, 1000);
+                };
+                if (uiGroups[el.cat]) uiGroups[el.cat].appendChild(btn);
+                else uiGroups.basic.appendChild(btn);
+                if (key === 'SAND') setActiveElement(el, btn);
+            });
+
+            document.getElementById('clearBtn').onclick = () => {
+                triggerShake(20);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0,0,GRID_SIZE,GRID_SIZE);
+                setTimeout(initGrid, 50);
+                triggerSpeech("Whoops! Clean slate.", 2000);
+            };
+
+            pauseBtn.onclick = () => {
+                isPaused = !isPaused;
+                document.getElementById('iconPause').classList.toggle('hidden');
+                document.getElementById('iconPlay').classList.toggle('hidden');
+                pauseBtn.classList.toggle('text-yellow-400');
+                pauseBtn.classList.toggle('border-yellow-400');
+                triggerSpeech(isPaused ? "Time frozen!" : "Physics resumed!", 1500);
+            };
+
+            gravityBtn.onclick = () => {
+                gravityEnabled = !gravityEnabled;
+                gravityBtn.classList.toggle('text-blue-300');
+                gravityBtn.classList.toggle('text-slate-500');
+                gravityBtn.classList.toggle('border-slate-600');
+                gravityBtn.classList.toggle('border-blue-500');
+                
+                if(!gravityEnabled) {
+                    avatar.classList.add('floating');
+                    triggerSpeech("Whoa! Zero gravity!", 3000);
+                } else {
+                    avatar.classList.remove('floating');
+                    triggerSpeech("Gravity normal.", 2000);
+                }
+            };
+
+            const updateBrush = (e) => brushSize = parseInt(e.target.value);
+            document.getElementById('brushSizeSlider').addEventListener('input', updateBrush);
+            document.getElementById('mobileBrushSlider').addEventListener('input', updateBrush);
+        }
+
+        function setActiveElement(el, btn) {
+            activeElement = el;
+            activeElementDisplay.textContent = el.label.toUpperCase();
+            activeElementDisplay.style.color = el.color;
+            activeElementDisplay.style.textShadow = `0 0 15px ${el.color}`;
+            activeColorIndicator.style.backgroundColor = el.color;
+            activeColorIndicator.style.boxShadow = `0 0 15px ${el.color}`;
+            
+            document.querySelectorAll('.btn-neon').forEach(b => {
+                b.classList.remove('btn-active');
+                b.style.borderColor = '';
+            });
+            if (btn) btn.classList.add('btn-active');
+        }
+
+        function triggerShake(amount) { shakeIntensity = amount; }
+
+        // --- Dr. Pixel Observer Logic ---
+        function updateObserver() {
+            // Reset counts
+            elementCounts = { dangerous: 0, chaos: 0, life: 0, total: 0 };
+            
+            // Sample grid (every 4th pixel for speed)
+            for(let y=0; y<GRID_SIZE; y+=4) {
+                for(let x=0; x<GRID_SIZE; x+=4) {
+                    const pid = grid[y][x];
+                    if (pid !== ELEMENTS.EMPTY.id) {
+                        elementCounts.total++;
+                        const p = ELEMENT_LOOKUP[pid];
+                        if (p.id === ELEMENTS.FIRE.id || p.id === ELEMENTS.C4.id || p.id === ELEMENTS.VIRUS.id || p.id === ELEMENTS.THUNDER.id) {
+                            elementCounts.dangerous++;
+                        }
+                        if (p.id === ELEMENTS.METHANE.id || p.id === ELEMENTS.ACID.id) {
+                            elementCounts.chaos++;
+                        }
+                        if (p.id === ELEMENTS.PLANT.id || p.id === ELEMENTS.FIREWORK.id) {
+                            elementCounts.life++;
+                        }
+                    }
+                }
+            }
+
+            // React
+            if (elementCounts.dangerous > 50) {
+                avatar.innerText = "😱";
+                avatar.classList.add('shaking');
+                if (Math.random() < 0.05) triggerSpeech("Too dangerous!!", 2000);
+            } else if (elementCounts.life > 50) {
+                avatar.innerText = "🤩";
+                avatar.classList.remove('shaking');
+                if (Math.random() < 0.05) triggerSpeech("So pretty!", 2000);
+            } else if (elementCounts.chaos > 50) {
+                avatar.innerText = "🤢";
+                avatar.classList.remove('shaking');
+                if (Math.random() < 0.05) triggerSpeech("Smells bad in here...", 2000);
+            } else if (elementCounts.total > 800) {
+                 avatar.innerText = "🤔";
+                 avatar.classList.remove('shaking');
+            } else {
+                avatar.innerText = "👨‍🔬";
+                avatar.classList.remove('shaking');
+            }
+        }
+
+        function triggerSpeech(text, duration = 3000) {
+            if (bubbleTimeout) clearTimeout(bubbleTimeout);
+            bubble.innerText = text;
+            bubble.classList.add('show');
+            bubbleTimeout = setTimeout(() => {
+                bubble.classList.remove('show');
+            }, duration);
+        }
+
+        // --- Input ---
+        function getGridPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const cx = e.touches ? e.touches[0].clientX : e.clientX;
+            const cy = e.touches ? e.touches[0].clientY : e.clientY;
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return { x: Math.floor((cx - rect.left) * scaleX), y: Math.floor((cy - rect.top) * scaleY) };
+        }
+
+        function placeCircle(cx, cy) {
+            const r = brushSize;
+            for (let y = cy - r; y <= cy + r; y++) {
+                for (let x = cx - r; x <= cx + r; x++) {
+                    if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+                        if ((x-cx)*(x-cx) + (y-cy)*(y-cy) <= r*r) {
+                            const t = grid[y][x];
+                            const isEmpty = t === ELEMENTS.EMPTY.id;
+                            const isWall = activeElement.id === ELEMENTS.WALL.id;
+                            const isEraser = activeElement.id === ELEMENTS.EMPTY.id;
+                            const isStrong = activeElement.id === ELEMENTS.METEOR.id || activeElement.id === ELEMENTS.THUNDER.id;
+                            
+                            if (isEmpty || isWall || isEraser || isStrong) {
+                                grid[y][x] = activeElement.id;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function handleInput(e) {
+            if (e.cancelable) e.preventDefault();
+            const pos = getGridPos(e);
+            if (isDrawing) {
+                if (lastGridX !== -1) {
+                    const dist = Math.hypot(pos.x - lastGridX, pos.y - lastGridY);
+                    const steps = Math.max(1, Math.ceil(dist));
+                    for (let i = 0; i < steps; i++) {
+                        const t = i / steps;
+                        placeCircle(Math.round(lastGridX + (pos.x - lastGridX) * t), Math.round(lastGridY + (pos.y - lastGridY) * t));
+                    }
+                }
+                placeCircle(pos.x, pos.y);
+                lastGridX = pos.x; lastGridY = pos.y;
+            }
+        }
+
+        function initEvents() {
+            const start = (e) => { isDrawing = true; handleInput(e); };
+            const move = (e) => { if (isDrawing) handleInput(e); };
+            const end = () => { isDrawing = false; lastGridX = -1; lastGridY = -1; };
+            canvas.addEventListener('mousedown', start); window.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+            canvas.addEventListener('touchstart', start, { passive: false }); window.addEventListener('touchmove', move, { passive: false }); window.addEventListener('touchend', end);
+        }
+
+        // --- Physics Engine ---
+        function update() {
+            if (isPaused) return;
+            tick++;
+            const nextGrid = grid.map(row => [...row]);
+            const randDir = Math.random() < 0.5; 
+
+            for (let y = GRID_SIZE - 1; y >= 0; y--) {
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    const x = randDir ? i : (GRID_SIZE - 1 - i);
+                    const pid = grid[y][x];
+                    if (pid === ELEMENTS.EMPTY.id || pid === ELEMENTS.WALL.id) continue;
+                    
+                    const p = ELEMENT_LOOKUP[pid];
+                    let moved = false;
+
+                    // --- INTERACTIONS ---
+                    
+                    // WATER EXTINGUISHES FIRE
+                    if (p.id === ELEMENTS.WATER.id) {
+                        const neighbors = [[0,1], [0,-1], [1,0], [-1,0]];
+                        for (let [dx, dy] of neighbors) {
+                            const nx=x+dx, ny=y+dy;
+                            if (nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE) {
+                                const tid = grid[ny][nx];
+                                if (tid === ELEMENTS.FIRE.id) {
+                                    nextGrid[ny][nx] = ELEMENTS.STEAM.id; 
+                                    nextGrid[y][x] = ELEMENTS.STEAM.id;
+                                    triggerSpeech("Sizzle!", 500);
+                                    moved = true; break;
+                                }
+                                if (tid === ELEMENTS.LAVA.id) {
+                                    nextGrid[ny][nx] = ELEMENTS.WALL.id; 
+                                    nextGrid[y][x] = ELEMENTS.STEAM.id;
+                                    moved = true; break;
+                                }
+                            }
+                        }
+                        if(moved) continue;
+                    }
+
+                    // FIRE LOGIC
+                    if (p.id === ELEMENTS.FIRE.id) {
+                        if (Math.random() < 0.1) { nextGrid[y][x] = ELEMENTS.EMPTY.id; continue; }
+                        
+                        const neighbors = [[0,-1], [0,1], [1,0], [-1,0]];
+                        for (let [dx, dy] of neighbors) {
+                            const nx=x+dx, ny=y+dy;
+                            if (nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE) {
+                                const tid = grid[ny][nx];
+                                // Ignite
+                                if (tid === ELEMENTS.GUNPOWDER.id || tid === ELEMENTS.OIL.id || tid === ELEMENTS.FUSE.id || tid === ELEMENTS.PLANT.id) {
+                                    nextGrid[ny][nx] = ELEMENTS.FIRE.id;
+                                }
+                                // Methane Explosion
+                                if (tid === ELEMENTS.METHANE.id) {
+                                    nextGrid[ny][nx] = ELEMENTS.FIRE.id; 
+                                    triggerShake(5);
+                                    if(Math.random()<0.1) triggerSpeech("BOOM!", 1000);
+                                }
+                                // Melt Ice
+                                if (tid === ELEMENTS.ICE.id) {
+                                    nextGrid[ny][nx] = ELEMENTS.WATER.id; 
+                                    nextGrid[y][x] = ELEMENTS.EMPTY.id;
+                                    moved = true; break;
+                                }
+                            }
+                        }
+                        if(moved) continue;
+                    }
+
+                    // PLANT GROWTH
+                    if (p.id === ELEMENTS.PLANT.id) {
+                         // Drink water
+                         const neighbors = [[0,1], [0,-1], [1,0], [-1,0]];
+                         for (let [dx, dy] of neighbors) {
+                             const nx=x+dx, ny=y+dy;
+                             if (nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE) {
+                                 if (grid[ny][nx] === ELEMENTS.WATER.id) {
+                                     nextGrid[ny][nx] = ELEMENTS.PLANT.id; // Grow
+                                 }
+                             }
+                         }
+                         // Small chance to grow up
+                         if(Math.random() < 0.01 && y>0 && grid[y-1][x] === ELEMENTS.EMPTY.id) {
+                             nextGrid[y-1][x] = ELEMENTS.PLANT.id;
+                         }
+                         continue;
+                    }
+
+                    // ACID LOGIC
+                    if (p.id === ELEMENTS.ACID.id) {
+                        const neighbors = [[0,1], [1,0], [-1,0]];
+                        for (let [dx, dy] of neighbors) {
+                             const nx=x+dx, ny=y+dy;
+                             if (nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE) {
+                                 const tid = grid[ny][nx];
+                                 if (tid !== ELEMENTS.EMPTY.id && tid !== ELEMENTS.ACID.id && tid !== ELEMENTS.WALL.id) {
+                                     if(Math.random() < 0.1) {
+                                         nextGrid[ny][nx] = ELEMENTS.EMPTY.id; 
+                                         if(Math.random() < 0.3) nextGrid[y][x] = ELEMENTS.METHANE.id; // Fumes
+                                         moved = true;
+                                     }
+                                 }
+                             }
+                        }
+                        if(moved) continue;
+                    }
+                    
+                    // C4 LOGIC
+                    if (p.id === ELEMENTS.C4.id) {
+                        let boom = false;
+                        const neighbors = [[0,1], [0,-1], [1,0], [-1,0]];
+                        for(let [dx, dy] of neighbors) {
+                             const nx=x+dx, ny=y+dy;
+                             if(nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE) {
+                                 const t = grid[ny][nx];
+                                 if(t === ELEMENTS.FIRE.id || t === ELEMENTS.LAVA.id || t === ELEMENTS.THUNDER.id) {
+                                     boom = true; break;
+                                 }
+                             }
+                        }
+                        if(boom) {
+                            triggerShake(30);
+                            triggerSpeech("EXPLOSION!", 1500);
+                            const r = 8; 
+                            for(let dy=-r; dy<=r; dy++){
+                                for(let dx=-r; dx<=r; dx++){
+                                    if(dx*dx+dy*dy <= r*r){
+                                        const nx=x+dx, ny=y+dy;
+                                        if(nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE && grid[ny][nx] !== ELEMENTS.WALL.id) {
+                                            nextGrid[ny][nx] = Math.random() > 0.3 ? ELEMENTS.FIRE.id : ELEMENTS.EMPTY.id;
+                                        }
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+                    }
+
+                    // THUNDER Logic
+                    if (p.id === ELEMENTS.THUNDER.id) {
+                         nextGrid[y][x] = ELEMENTS.EMPTY.id; 
+                         let ty = y;
+                         while(ty < GRID_SIZE - 1) {
+                             ty++;
+                             const tid = nextGrid[ty][x];
+                             if (tid === ELEMENTS.WALL.id) break;
+                             if (tid !== ELEMENTS.EMPTY.id) {
+                                 if (tid === ELEMENTS.SAND.id) nextGrid[ty][x] = ELEMENTS.WALL.id; 
+                                 else nextGrid[ty][x] = ELEMENTS.FIRE.id;
+                                 break;
+                             }
+                             if (Math.random() > 0.5) nextGrid[ty][x] = ELEMENTS.THUNDER.id;
+                         }
+                         continue;
+                    }
+
+                    // FIREWORK
+                    if (p.id === ELEMENTS.FIREWORK.id) {
+                        const nx = x + (Math.floor(Math.random()*3)-1);
+                        const ny = y - 1;
+                        if (ny > 0 && grid[ny][nx] === ELEMENTS.EMPTY.id) {
+                             nextGrid[y][x] = ELEMENTS.EMPTY.id;
+                             nextGrid[ny][nx] = ELEMENTS.FIREWORK.id;
+                             if(Math.random() < 0.03 || ny < 10) {
+                                 triggerShake(5);
+                                 nextGrid[ny][nx] = ELEMENTS.FIRE.id;
+                                 for(let k=0; k<15; k++){
+                                     const rx = nx + Math.floor(Math.random()*10)-5;
+                                     const ry = ny + Math.floor(Math.random()*10)-5;
+                                     if(rx>=0 && rx<GRID_SIZE && ry>=0 && ry<GRID_SIZE) nextGrid[ry][rx] = Math.random()>0.5 ? ELEMENTS.FIRE.id : ELEMENTS.GUNPOWDER.id;
+                                 }
+                             }
+                        }
+                        continue;
+                    }
+
+                    // MOVEMENT
+                    if (p.type === 'solid') continue;
+
+                    // Zero-G Drift
+                    if (!gravityEnabled && p.type !== 'projectile') {
+                         if (Math.random() < 0.15) {
+                             const dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+                             const [dx, dy] = dirs[Math.floor(Math.random()*4)];
+                             const nx=x+dx, ny=y+dy;
+                             if (nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE && nextGrid[ny][nx] === ELEMENTS.EMPTY.id) {
+                                 nextGrid[ny][nx] = pid;
+                                 nextGrid[y][x] = ELEMENTS.EMPTY.id;
+                             }
+                         }
+                         continue;
+                    }
+
+                    const isGas = p.type === 'gas';
+                    const dy = isGas ? -1 : 1;
+                    const belowY = y + dy;
+
+                    if (belowY < 0 || belowY >= GRID_SIZE) continue;
+
+                    const belowId = grid[belowY][x];
+                    const belowP = ELEMENT_LOOKUP[belowId];
+                    
+                    let canMove = isGas ? (p.density < belowP.density) : (p.density > belowP.density);
+
+                    if (canMove) {
+                        nextGrid[belowY][x] = pid;
+                        nextGrid[y][x] = belowId;
+                    } else if (p.type === 'liquid' || p.type === 'gas') {
+                        const dir = Math.random() < 0.5 ? 1 : -1;
+                        const dxs = [dir, -dir];
+                        for (let dx of dxs) {
+                            const nx = x + dx;
+                            if (nx >= 0 && nx < GRID_SIZE) {
+                                const diagId = grid[belowY][nx];
+                                const diagP = ELEMENT_LOOKUP[diagId];
+                                const canDiag = isGas ? (p.density < diagP.density) : (p.density > diagP.density);
+                                
+                                if (canDiag) {
+                                    nextGrid[belowY][nx] = pid;
+                                    nextGrid[y][x] = diagId;
+                                    break;
+                                } else {
+                                    const sideId = grid[y][nx];
+                                    const sideP = ELEMENT_LOOKUP[sideId];
+                                    const canSide = isGas ? (p.density < sideP.density) : (p.density > sideP.density);
+                                    if (canSide) {
+                                        nextGrid[y][nx] = pid;
+                                        nextGrid[y][x] = sideId;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            grid = nextGrid;
+            
+            if (tick % 30 === 0) updateObserver();
+        }
+
+        // --- Rendering ---
+        function draw() {
+            if (shakeIntensity > 0) {
+                const dx = (Math.random() - 0.5) * shakeIntensity;
+                const dy = (Math.random() - 0.5) * shakeIntensity;
+                canvasContainer.style.transform = `translate(${dx}px, ${dy}px)`;
+                shakeIntensity *= SHAKE_DECAY;
+                if (shakeIntensity < 0.5) { shakeIntensity = 0; canvasContainer.style.transform = 'none'; }
+            }
+
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, GRID_SIZE, GRID_SIZE);
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const pid = grid[y][x];
+                    if (pid !== ELEMENTS.EMPTY.id) {
+                        const p = ELEMENT_LOOKUP[pid];
+                        let color = p.color;
+                        
+                        // Dynamic Visuals
+                        if (p.id === ELEMENTS.FIRE.id || p.id === ELEMENTS.LAVA.id || p.id === ELEMENTS.METEOR.id) {
+                            if (Math.random() > 0.7) ctx.fillStyle = '#fbbf24'; // Yellow flicker
+                            else ctx.fillStyle = color;
+                        } 
+                        else if (p.id === ELEMENTS.WATER.id) {
+                             if (Math.random() > 0.95) ctx.fillStyle = '#60a5fa'; // Shimmer
+                             else ctx.fillStyle = color;
+                        }
+                        else if (p.id === ELEMENTS.THUNDER.id) ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#38bdf8';
+                        else if (p.id === ELEMENTS.METHANE.id) {
+                             if(Math.random() > 0.6) continue; // Gas transparency
+                             ctx.fillStyle = color;
+                        }
+                        else ctx.fillStyle = color;
+                        
+                        ctx.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+            
+            // Glow Overlay
+            for (let i=0; i<80; i++) {
+                const x = Math.floor(Math.random() * GRID_SIZE);
+                const y = Math.floor(Math.random() * GRID_SIZE);
+                const pid = grid[y][x];
+                if (pid !== ELEMENTS.EMPTY.id) {
+                    const p = ELEMENT_LOOKUP[pid];
+                    if (p.glow) {
+                        ctx.fillStyle = p.color;
+                        ctx.globalAlpha = 0.2; 
+                        ctx.fillRect(x-1, y-1, 3, 3); 
+                        ctx.globalAlpha = 1.0;
+                    }
+                }
+            }
+
+            frames++;
+            const now = performance.now();
+            if (now - lastTime >= 1000) {
+                fpsCounter.textContent = frames;
+                frames = 0;
+                lastTime = now;
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        initGrid();
+        initCanvas();
+        initUI();
+        initEvents();
+        loop();
+
+    </script>
+</body>
+</html>
